@@ -21,7 +21,7 @@ def main(hparams):
     model = CustomCLIPWrapper(img_encoder, txt_encoder, hparams.minibatch_size, avg_word_embs=True)
     dm = TextImageDataModule.from_argparse_args(hparams, custom_tokenizer=tokenizer)
     hom_model = HomotopyCLIPModule(model)
-    trainer = Trainer.from_argparse_args(hparams, precision=16, max_epochs=32, accelerator='gpu', gpus=1)
+    trainer = Trainer.from_argparse_args(hparams, precision=16, max_epochs=32, accelerator='gpu', gpus=1, logger=True)
     trainer.fit(hom_model, dm)
 
 
