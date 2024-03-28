@@ -31,14 +31,31 @@ class CLIPWrapper(pl.LightningModule):
 
         self.automatic_optimization = False
     
-    # Sourced from https://github.com/PyTorchLightning/pytorch-lightning/issues/5449
+    # # Sourced from https://github.com/PyTorchLightning/pytorch-lightning/issues/5449
+    # @property
+    # def num_training_steps(self) -> int:
+    #     """Total training steps inferred from datamodule and devices."""
+    #     dataset = self.train_dataloader()
+    #     if self.trainer.max_steps:
+    #         return self.trainer.max_steps
+
+    #     dataset_size = len(dataset)
+
+    #     num_devices = max(1, self.trainer.num_gpus, self.trainer.num_processes)
+    #     if self.trainer.tpu_cores:
+    #         num_devices = max(num_devices, self.trainer.tpu_cores)
+
+    #     effective_batch_size = dataset.batch_size * self.trainer.accumulate_grad_batches * num_devices
+    #     return (dataset_size // effective_batch_size) * self.trainer.max_epochs
+    
     @property
     def num_training_steps(self) -> int:
         """Total training steps inferred from datamodule and devices."""
-        dataset = self.train_dataloader()
-        if self.trainer.max_steps:
-            return self.trainer.max_steps
+        #if self.trainer.max_steps:
+        #    return self.trainer.max_steps
 
+        #dataset = self.train_dataloader()
+        dataset = self.trainer._data_connector._train_dataloader_source.dataloader()
         dataset_size = len(dataset)
 
         num_devices = max(1, self.trainer.num_gpus, self.trainer.num_processes)
@@ -46,7 +63,12 @@ class CLIPWrapper(pl.LightningModule):
             num_devices = max(num_devices, self.trainer.tpu_cores)
 
         effective_batch_size = dataset.batch_size * self.trainer.accumulate_grad_batches * num_devices
-        return (dataset_size // effective_batch_size) * self.trainer.max_epochs
+        #print(dataset.batch_size, self.trainer.accumulate_grad_batches, num_devices)
+        #print(dataset_size, effective_batch_size, self.trainer.max_epochs)
+        #num_steps = (dataset_size // effective_batch_size) * self.trainer.max_epochs
+        num_steps = dataset_size * self.trainer.max_epochs // (self.trainer.accumulate_grad_batches * num_devices)
+        print(num_steps)
+        return num_steps
 
     # Training loss: https://github.com/openai/CLIP/issues/83
     # Mini-batching thanks to https://github.com/crowsonkb / https://twitter.com/RiversHaveWings
