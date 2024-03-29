@@ -291,6 +291,11 @@ class CustomCLIPWrapper(CLIPWrapper):
         self.model.logit_scale.data.clamp_(-np.log(100), np.log(100))
         self.sink_temp.data.clamp_(-np.log(100), np.log(100))
         self.update_teacher()
+    
+    def encode_image(self, images):
+        # Assuming self.model.visual is set to your image encoder and is ready to process image inputs
+        return self.model.visual(images)
+
 
     def encode_text(self, inputs, teacher=False):
         if self.avg_word_embs:
