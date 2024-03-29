@@ -75,8 +75,15 @@ class HomotopyCLIPModule(pl.LightningModule):
         return similarity
 
     def update_homotopy_parameter(self):
+        # Calculate the total number of training steps across all epochs
+        total_training_steps = self.total_steps * self.trainer.max_epochs
+        
+        # Calculate the current overall step across all epochs
+        current_overall_step = self.trainer.global_step + self.trainer.current_epoch * self.total_steps
+        
         # Calculate the fraction of training completed
-        current_progress = self.trainer.global_step / self.total_steps
+        current_progress = current_overall_step / total_training_steps
+        
         # Ensure the progress fraction remains within [0, 1]
         self.t = torch.tensor(max(0.0, min(current_progress, 1.0)), device=self.t.device)
 
