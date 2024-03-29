@@ -75,9 +75,10 @@ class HomotopyCLIPModule(pl.LightningModule):
         return similarity
 
     def update_homotopy_parameter(self):
-        # Update step and homotopy parameter 't'
-        self.current_step += 1
-        self.t = torch.tensor(self.current_step / self.total_steps, device=self.t.device)
+        # Calculate the fraction of training completed
+        current_progress = self.trainer.global_step / self.total_steps
+        # Ensure the progress fraction remains within [0, 1]
+        self.t = torch.tensor(max(0.0, min(current_progress, 1.0)), device=self.t.device)
 
     def configure_optimizers(self):
         # Implement a learning rate scheduler that decreases from start_lr to end_lr
