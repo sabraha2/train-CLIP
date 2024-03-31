@@ -66,6 +66,7 @@ class HomotopyCLIPModule(pl.LightningModule):
 
             # Process texts to visualize as images in TensorBoard
             texts_to_log = self.process_texts_for_logging(texts)
+            texts_to_log = texts_to_log.squeeze(0)  # Remove the batch dimension
             self.logger.experiment.add_image('training_texts', texts_to_log, self.global_step)
         
         # Update homotopy parameter
