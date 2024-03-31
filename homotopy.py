@@ -64,10 +64,9 @@ class HomotopyCLIPModule(pl.LightningModule):
             grid = make_grid(images)
             self.logger.experiment.add_image('training_images', grid, self.global_step)
 
-            # Process texts to visualize as images in TensorBoard
-            texts_to_log = self.process_texts_for_logging(texts)
-            texts_to_log = texts_to_log.squeeze(0)  # Remove the batch dimension
-            self.logger.experiment.add_image('training_texts', texts_to_log, self.global_step)
+            # Log text using TensorBoard's text logging
+            text_str = self.process_texts_for_logging(texts)
+            self.logger.experiment.add_text('training_texts', text_str, self.global_step)
         
         # Update homotopy parameter
         self.update_homotopy_parameter()
@@ -79,34 +78,12 @@ class HomotopyCLIPModule(pl.LightningModule):
         return combined_loss
     
     def process_texts_for_logging(self, texts):
-        # Turn text into a list of strings if it's tokenized
-        if isinstance(texts, dict):
-            texts = self.tokenizer.batch_decode(texts['input_ids'], skip_special_tokens=True)
-
-        # Create a figure and a set of subplots
-        fig, ax = plt.subplots()
-
-        # Hide axes
-        ax.axis('off')
-
-        # Set the text at the center of the figure
-        ax.text(0.5, 0.5, "\n".join(texts), fontsize=12, ha='center')
-
-        # Save the plot to a buffer
-        buf = io.BytesIO()
-        plt.savefig(buf, format='jpeg')
-        buf.seek(0)
-
-        # Ensure to specify the format as 'jpeg' when reading the image
-        text_image = plt.imread(buf, format='jpeg')
-        plt.close(fig)
-
-        # Convert the image into a torch tensor and permute the dimensions
-        # Note: You'll need to adjust the tensor conversion as plt.imread returns a numpy array
-        text_image_tensor = torch.from_numpy(text_image).permute(2, 0, 1).float() / 255.0  # Normalize the image
-        text_image_tensor = text_image_tensor.unsqueeze(0)  # Add batch dimension
-
-        return text_image_tensor
+        # Decoding the text tokens to strings
+        decoded_texts = self.tokenizer.batch_decode(texts['input_ids'], skip_special_tokens=True)
+        # Join all the text entries into a single string separated by newlines
+        text_str = "\n\n".join(decoded_texts)
+        # Return the combined text string
+        return text_str
 
 
     def compute_contrastive_loss(self, image_features, text_features):
