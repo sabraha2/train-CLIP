@@ -59,7 +59,7 @@ class HomotopyCLIPModule(pl.LightningModule):
         accuracy_t2i = correct_t2i.float() / logits_t.size(0)
         overall_accuracy = (accuracy_i2t + accuracy_t2i) / 2
 
-        if self.trainer.global_step % self.hparams.log_image_interval == 0:
+        if self.trainer.global_step % 100 == 0:
             # Log images
             grid = make_grid(images)
             self.logger.experiment.add_image('training_images', grid, self.global_step)
