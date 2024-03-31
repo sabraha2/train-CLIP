@@ -9,6 +9,8 @@ from homotopy import HomotopyCLIPModule
 
 
 def main(hparams):
+    torch.autograd.set_detect_anomaly(True)  # Enable anomaly detection to find the operations that produce NaNs
+
     img_encoder = resnet50(pretrained=True)
     img_encoder.fc = torch.nn.Linear(2048, 768)
 
@@ -20,8 +22,20 @@ def main(hparams):
 
     model = CustomCLIPWrapper(img_encoder, txt_encoder, hparams.minibatch_size, avg_word_embs=True)
     dm = TextImageDataModule.from_argparse_args(hparams, custom_tokenizer=tokenizer)
-    hom_model = HomotopyCLIPModule(model)
-    trainer = Trainer.from_argparse_args(hparams, precision=16, max_epochs=32, accelerator='gpu', gpus=1, logger=True)
+    hom_model = HomotopyCLIPModule(model, tokenizer=tokenizer)
+    
+    # Update Trainer initialization with gradient clipping and terminate_on_nan
+    trainer = Trainer.from_argparse_args(
+        hparams,
+        precision=16,  # Consider using 32 to disable mixed precision if NaNs persist
+        max_epochs=32,
+        accelerator='gpu',
+        gpus=1,
+        logger=True,
+        gradient_clip_val=1.0,  # Add gradient clipping
+        terminate_on_nan=True,  # Stop training on NaNs
+    )
+    
     trainer.fit(hom_model, dm)
 
 

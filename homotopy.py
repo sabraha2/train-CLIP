@@ -1,6 +1,10 @@
 import pytorch_lightning as pl
+from torchvision.utils import make_grid
+import matplotlib.pyplot as plt
+import io
 import torch
 import torch.nn.functional as F
+import math
 
 class HomotopyCLIPModule(pl.LightningModule):
     def __init__(self, model, start_lr=1e-4, end_lr=1e-6, total_steps=1000, temperature=0.07):
@@ -31,13 +35,71 @@ class HomotopyCLIPModule(pl.LightningModule):
         
         # Combined loss using homotopy parameter
         combined_loss = (1 - self.t) * contrastive_loss + self.t * similarity_loss
+
+        # NaN detection
+        if torch.isnan(combined_loss).any():
+            self.log('train_loss', float('nan'), prog_bar=True)  # Log NaN loss
+            raise pl.utilities.exceptions.CancelBatchException()  # Skip the rest of this training step
+       
+        # Compute similarities
+        logits = torch.matmul(image_features, text_features.t())
+        logits_t = logits.t()
+
+        # Calculate image-to-text accuracy
+        predictions_i2t = logits.argmax(dim=1)
+        correct_i2t = predictions_i2t.eq(torch.arange(logits.size(0), device=self.device)).sum()
+        
+        # Calculate text-to-image accuracy
+        predictions_t2i = logits_t.argmax(dim=1)
+        correct_t2i = predictions_t2i.eq(torch.arange(logits_t.size(0), device=self.device)).sum()
+
+        # Aggregate accuracies
+        accuracy_i2t = correct_i2t.float() / logits.size(0)
+        accuracy_t2i = correct_t2i.float() / logits_t.size(0)
+        overall_accuracy = (accuracy_i2t + accuracy_t2i) / 2
+
+        if self.trainer.global_step % self.hparams.log_image_interval == 0:
+            # Log images
+            grid = make_grid(images)
+            self.logger.experiment.add_image('training_images', grid, self.global_step)
+
+            # Process texts to visualize as images in TensorBoard
+            texts_to_log = self.process_texts_for_logging(texts)
+            self.logger.experiment.add_image('training_texts', texts_to_log, self.global_step)
         
         # Update homotopy parameter
         self.update_homotopy_parameter()
         
         self.log("train_loss", combined_loss, prog_bar=True)
+        self.log("train_accuracy", overall_accuracy, on_step=False, on_epoch=True, prog_bar=True)
         self.log("homotopy_t", self.t, prog_bar=True)
+
         return combined_loss
+    
+    def process_texts_for_logging(self, texts):
+        # Turn text into a list of strings if it's tokenized
+        if isinstance(texts, dict):
+            texts = self.tokenizer.batch_decode(texts['input_ids'], skip_special_tokens=True)
+        
+        # Create a figure and a set of subplots
+        fig, ax = plt.subplots()
+        
+        # Hide axes
+        ax.axis('off')
+        
+        # Set the text at the center of the figure
+        ax.text(0.5, 0.5, "\n".join(texts), fontsize=12, ha='center')
+        
+        # Save the plot to a buffer
+        buf = io.BytesIO()
+        plt.savefig(buf, format='jpeg')
+        buf.seek(0)
+        
+        # Convert buffer to tensor
+        text_image = plt.imread(buf)
+        plt.close(fig)
+        
+        return torch.tensor(text_image).permute(2, 0, 1).unsqueeze(0)  # Add batch dimension
 
     def compute_contrastive_loss(self, image_features, text_features):
         """
@@ -74,6 +136,21 @@ class HomotopyCLIPModule(pl.LightningModule):
         similarity = (image_features * text_features).sum(dim=1).mean()
         return similarity
 
+    # def update_homotopy_parameter(self):
+    #     # Calculate the total number of training steps across all epochs
+    #     total_training_steps = self.total_steps * self.trainer.max_epochs
+        
+    #     # Calculate the current overall step across all epochs
+    #     current_overall_step = self.trainer.global_step + self.trainer.current_epoch * self.total_steps
+        
+    #     # Calculate the fraction of training completed
+    #     current_progress = current_overall_step / total_training_steps
+        
+    #     # Ensure the progress fraction remains within [0, 1]
+    #     self.t = torch.tensor(max(0.0, min(current_progress, 1.0)), device=self.t.device)
+
+    import math
+
     def update_homotopy_parameter(self):
         # Calculate the total number of training steps across all epochs
         total_training_steps = self.total_steps * self.trainer.max_epochs
@@ -81,14 +158,33 @@ class HomotopyCLIPModule(pl.LightningModule):
         # Calculate the current overall step across all epochs
         current_overall_step = self.trainer.global_step + self.trainer.current_epoch * self.total_steps
         
-        # Calculate the fraction of training completed
-        current_progress = current_overall_step / total_training_steps
+        # Instead of linearly increasing 't', use a sigmoid function to get a smooth transition
+        # Compute a 'progress' value that goes from -6 to 6 over the training steps, 
+        # which corresponds to the steep part of the sigmoid function
+        progress = (current_overall_step / total_training_steps - 0.5) * 12
+        sigmoid_t = 1 / (1 + math.exp(-progress))
         
-        # Ensure the progress fraction remains within [0, 1]
-        self.t = torch.tensor(max(0.0, min(current_progress, 1.0)), device=self.t.device)
+        # Update the homotopy parameter 't'
+        self.t = torch.tensor(sigmoid_t, device=self.device)
+
+
+    # def configure_optimizers(self):
+    #     # Implement a learning rate scheduler that decreases from start_lr to end_lr
+    #     optimizer = torch.optim.Adam(self.model.parameters(), lr=self.start_lr)
+    #     scheduler = torch.optim.lr_scheduler.LinearLR(optimizer, start_factor=1.0, end_factor=self.end_lr/self.start_lr, total_iters=self.total_steps)
+    #     return [optimizer], [scheduler]
 
     def configure_optimizers(self):
-        # Implement a learning rate scheduler that decreases from start_lr to end_lr
         optimizer = torch.optim.Adam(self.model.parameters(), lr=self.start_lr)
-        scheduler = torch.optim.lr_scheduler.LinearLR(optimizer, start_factor=1.0, end_factor=self.end_lr/self.start_lr, total_iters=self.total_steps)
-        return [optimizer], [scheduler]
+        scheduler = {
+            'scheduler': torch.optim.lr_scheduler.LinearLR(
+                optimizer, start_factor=1.0, end_factor=self.end_lr/self.start_lr, total_iters=self.total_steps
+            ),
+            'interval': 'step',  # or 'epoch' depending on how you've scheduled it
+            'frequency': 1,
+        }
+        return {
+            'optimizer': optimizer,
+            'lr_scheduler': scheduler,
+            'gradient_clip_val': 1.0,  # add gradient clipping here
+        }
