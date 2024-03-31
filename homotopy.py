@@ -81,26 +81,32 @@ class HomotopyCLIPModule(pl.LightningModule):
         # Turn text into a list of strings if it's tokenized
         if isinstance(texts, dict):
             texts = self.tokenizer.batch_decode(texts['input_ids'], skip_special_tokens=True)
-        
+
         # Create a figure and a set of subplots
         fig, ax = plt.subplots()
-        
+
         # Hide axes
         ax.axis('off')
-        
+
         # Set the text at the center of the figure
         ax.text(0.5, 0.5, "\n".join(texts), fontsize=12, ha='center')
-        
+
         # Save the plot to a buffer
         buf = io.BytesIO()
         plt.savefig(buf, format='jpeg')
         buf.seek(0)
-        
-        # Convert buffer to tensor
-        text_image = plt.imread(buf)
+
+        # Ensure to specify the format as 'jpeg' when reading the image
+        text_image = plt.imread(buf, format='jpeg')
         plt.close(fig)
-        
-        return torch.tensor(text_image).permute(2, 0, 1).unsqueeze(0)  # Add batch dimension
+
+        # Convert the image into a torch tensor and permute the dimensions
+        # Note: You'll need to adjust the tensor conversion as plt.imread returns a numpy array
+        text_image_tensor = torch.from_numpy(text_image).permute(2, 0, 1).float() / 255.0  # Normalize the image
+        text_image_tensor = text_image_tensor.unsqueeze(0)  # Add batch dimension
+
+        return text_image_tensor
+
 
     def compute_contrastive_loss(self, image_features, text_features):
         """
