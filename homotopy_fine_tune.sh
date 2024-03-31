@@ -14,6 +14,9 @@ module load intel
 module load cuda
 module load cudnn
 
+
+fsync $SGE_STDOUT_PATH &
+
 source /afs/crc.nd.edu/user/s/sabraha2/Projects/SPIE_2024/venv/bin/activate
 
 python train_finetune_hom.py --folder /project01/cvrl/sabraha2/DSIAC_CLIP_DATA/ --batch_size 32 --num_workers 32 --default_root_dir /project01/cvrl/sabraha2/SPIE_2024/fine_tune_hom/
