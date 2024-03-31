@@ -33,7 +33,6 @@ def main(hparams):
         gpus=1,
         logger=True,
         gradient_clip_val=1.0,  # Add gradient clipping
-        terminate_on_nan=True,  # Stop training on NaNs
     )
     
     trainer.fit(hom_model, dm)
