@@ -7,9 +7,10 @@ import torch.nn.functional as F
 import math
 
 class HomotopyCLIPModule(pl.LightningModule):
-    def __init__(self, model, start_lr=1e-4, end_lr=1e-6, total_steps=1000, temperature=0.07):
+    def __init__(self, model, tokenizer, start_lr=1e-4, end_lr=1e-6, total_steps=1000, temperature=0.07):
         super().__init__()
         self.model = model
+        self.tokenizer = tokenizer
         self.start_lr = start_lr
         self.end_lr = end_lr
         self.total_steps = total_steps
