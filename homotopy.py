@@ -72,7 +72,7 @@ class HomotopyCLIPModule(pl.LightningModule):
         self.update_homotopy_parameter()
         
         self.log("train_loss", combined_loss, prog_bar=True)
-        self.log("train_accuracy", overall_accuracy, on_step=False, on_epoch=True, prog_bar=True)
+        self.log("train_accuracy", overall_accuracy, prog_bar=True)
         self.log("homotopy_t", self.t, prog_bar=True)
 
         return combined_loss
