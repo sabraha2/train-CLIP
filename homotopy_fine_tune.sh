@@ -3,7 +3,7 @@
 #$ -M sabraha2@nd.edu
 #$ -m abe
 #$ -q gpu-long
-#$ -l gpu_card=3
+#$ -l gpu_card=1
 #$ -l h=!qa-a10-*
 #$ -e errors/
 #$ -N HOM-clip-fine-tune-hom
