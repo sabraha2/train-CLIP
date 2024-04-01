@@ -200,6 +200,11 @@ class CustomCLIPWrapper(CLIPWrapper):
         self.kl_coeff = kl_coeff
 
     def training_step(self, train_batch, idx):
+        # Calculate the homotopy parameter 't' based on the current epoch
+        current_epoch = self.current_epoch
+        total_epochs = self.trainer.max_epochs
+        t = current_epoch / (total_epochs - 1)
+
         # get optimizers and scheduler
         optimizer = self.optimizers()
 
@@ -234,7 +239,15 @@ class CustomCLIPWrapper(CLIPWrapper):
             image_logits_notemp = torch.cat(ims) @ torch.cat(txt).t()
             image_logits = image_logits_notemp * self.model.logit_scale.exp()
             ground_truth = torch.arange(len(image_logits)).long().to(image_logits.device)
-            loss = (F.cross_entropy(image_logits, ground_truth) + F.cross_entropy(image_logits.t(), ground_truth)).div(2)
+            sym_loss = (F.cross_entropy(image_logits, ground_truth) + F.cross_entropy(image_logits.t(), ground_truth)).div(2)
+            # Compute the similarity for the whole batch
+            similarity = torch.mean(F.cosine_similarity(torch.cat(ims).unsqueeze(1), torch.cat(txt).unsqueeze(0), dim=2))
+            similarity_loss = -similarity  # Negate because we want to maximize similarity
+
+            # Compute the final loss using homotopy
+            final_loss = (1 - t) * sym_loss + t * similarity_loss
+
+
             acc_i = (torch.argmax(image_logits, 1) == ground_truth).sum()
             acc_t = (torch.argmax(image_logits, 0) == ground_truth).sum()
             # calculate teacher
@@ -258,8 +271,11 @@ class CustomCLIPWrapper(CLIPWrapper):
             txt_cost = - (sim_ii + sim_tt + sim_ti)
             img_target = self.sinkhorn(img_cost)
             txt_target = self.sinkhorn(txt_cost)
-            loss += (F.kl_div(F.log_softmax(image_logits_notemp * self.sink_temp, dim=-1), img_target, reduction='batchmean') + F.kl_div(F.log_softmax(image_logits_notemp.t() * self.sink_temp, dim=-1), txt_target, reduction='batchmean')) / 2 * self.kl_coeff
-            self.log_dict({'loss': loss / len(ims), 'acc': (acc_i + acc_t) / 2 / len(image) / len(ims)}, prog_bar=True)
+            sym_loss += (F.kl_div(F.log_softmax(image_logits_notemp * self.sink_temp, dim=-1), img_target, reduction='batchmean') + F.kl_div(F.log_softmax(image_logits_notemp.t() * self.sink_temp, dim=-1), txt_target, reduction='batchmean')) / 2 * self.kl_coeff
+            self.log_dict({'sym_loss': sym_loss / len(ims), 'acc': (acc_i + acc_t) / 2 / len(image) / len(ims)}, prog_bar=True)
+        
+        self.log('final_loss', final_loss.item(), prog_bar=True)
+        self.log('homotopy_t', t, prog_bar=True)
 
         if isinstance(optimizer, list):
             optimizer = optimizer[0]
@@ -271,9 +287,10 @@ class CustomCLIPWrapper(CLIPWrapper):
             images_tmp[self.global_rank][j*self.minibatch_size:(j+1)*self.minibatch_size] = F.normalize(self.model.encode_image(mb), dim=1)
             image_logits_notemp = torch.cat(images_tmp) @ torch.cat(txt).t()
             image_logits = image_logits_notemp * self.model.logit_scale.exp()
-            loss = (F.cross_entropy(image_logits, ground_truth) + F.cross_entropy(image_logits.t(), ground_truth))/2
-            loss += (F.kl_div(F.log_softmax(image_logits_notemp * self.sink_temp, dim=-1), img_target, reduction='batchmean') + F.kl_div(F.log_softmax(image_logits_notemp.t() * self.sink_temp, dim=-1), txt_target, reduction='batchmean')) / 2 * self.kl_coeff
-            self.manual_backward(loss)
+            sym_loss = (F.cross_entropy(image_logits, ground_truth) + F.cross_entropy(image_logits.t(), ground_truth))/2
+            sym_loss += (F.kl_div(F.log_softmax(image_logits_notemp * self.sink_temp, dim=-1), img_target, reduction='batchmean') + F.kl_div(F.log_softmax(image_logits_notemp.t() * self.sink_temp, dim=-1), txt_target, reduction='batchmean')) / 2 * self.kl_coeff
+            final_loss = (1 - t) * sym_loss + t * similarity_loss
+            self.manual_backward(final_loss)
 
         # text loss
         for j, mb in enumerate(text_mbs):
@@ -281,9 +298,10 @@ class CustomCLIPWrapper(CLIPWrapper):
             text_tmp[self.global_rank][j*self.minibatch_size:(j+1)*self.minibatch_size] = F.normalize(self.encode_text(mb), dim=1)
             image_logits_notemp = torch.cat(ims) @ torch.cat(text_tmp).t()
             image_logits = image_logits_notemp * self.model.logit_scale.exp()
-            loss = (F.cross_entropy(image_logits, ground_truth) + F.cross_entropy(image_logits.t(), ground_truth))/2
-            loss += (F.kl_div(F.log_softmax(image_logits_notemp * self.sink_temp, dim=-1), img_target, reduction='batchmean') + F.kl_div(F.log_softmax(image_logits_notemp.t() * self.sink_temp, dim=-1), txt_target, reduction='batchmean')) / 2 * self.kl_coeff
-            self.manual_backward(loss)
+            sym_loss = (F.cross_entropy(image_logits, ground_truth) + F.cross_entropy(image_logits.t(), ground_truth))/2
+            sym_loss += (F.kl_div(F.log_softmax(image_logits_notemp * self.sink_temp, dim=-1), img_target, reduction='batchmean') + F.kl_div(F.log_softmax(image_logits_notemp.t() * self.sink_temp, dim=-1), txt_target, reduction='batchmean')) / 2 * self.kl_coeff
+            final_loss = (1 - t) * sym_loss + t * similarity_loss
+            self.manual_backward(final_loss)
 
         optimizer.step()
         lr_scheduler = self.lr_schedulers()
@@ -291,6 +309,7 @@ class CustomCLIPWrapper(CLIPWrapper):
         self.model.logit_scale.data.clamp_(-np.log(100), np.log(100))
         self.sink_temp.data.clamp_(-np.log(100), np.log(100))
         self.update_teacher()
+    
     
     def encode_image(self, images):
         # Assuming self.model.visual is set to your image encoder and is ready to process image inputs
