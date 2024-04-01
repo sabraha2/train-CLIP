@@ -6,7 +6,7 @@
 #$ -l gpu_card=3
 #$ -l h=!qa-a10-*
 #$ -e errors/
-#$ -N clip-fine-tune-hom
+#$ -N HOM-clip-fine-tune-hom
 
 
 module load python
