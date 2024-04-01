@@ -6,7 +6,7 @@
 #$ -l gpu_card=1
 #$ -l h=!qa-a10-*
 #$ -e errors/
-#$ -N hom-16-epoch-tune
+#$ -N hom-10-epoch-tune
 
 
 module load python
