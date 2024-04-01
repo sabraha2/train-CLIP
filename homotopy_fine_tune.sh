@@ -6,7 +6,7 @@
 #$ -l gpu_card=1
 #$ -l h=!qa-a10-*
 #$ -e errors/
-#$ -N hom-10-epoch-tune
+#$ -N similarity-to-symm-fine-tune
 
 
 module load python
