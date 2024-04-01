@@ -245,7 +245,9 @@ class CustomCLIPWrapper(CLIPWrapper):
             similarity_loss = -similarity  # Negate because we want to maximize similarity
 
             # Compute the final loss using homotopy
-            final_loss = (1 - t) * sym_loss + t * similarity_loss
+            # final_loss = (1 - t) * sym_loss + t * similarity_loss
+
+            final_loss = (1 - t) * similarity_loss + t * sym_loss
 
 
             acc_i = (torch.argmax(image_logits, 1) == ground_truth).sum()
