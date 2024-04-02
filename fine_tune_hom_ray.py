@@ -54,7 +54,7 @@ def main(config):
     analysis = tune.run(
         train_model,
         config=tune_config,
-        search_alg=HyperOptSearch(metric="final_loss", mode="min"),  # Specify metric and mode
+        search_alg=HyperOptSearch(metric="loss", mode="min"),  # Specify metric and mode
         stop={"training_iteration": 10},
         resources_per_trial={"gpu": 1},
         num_samples=10,
