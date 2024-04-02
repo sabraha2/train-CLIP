@@ -42,7 +42,7 @@ def train_model(config, checkpoint_dir=None):
 
 def main(config):
     tune_config = {
-        "max_epochs": tune.randint(5, 20),  # Uniform distribution for max_epochs
+        "max_epochs": tune.randint(1, 2),  # Uniform distribution for max_epochs
         "minibatch_size": tune.choice([16, 32, 64]),  
         "batch_size": config['batch_size'],
         "learning_rate": hp.loguniform('learning_rate', -5, -3),  
@@ -54,7 +54,7 @@ def main(config):
     analysis = tune.run(
         train_model,
         config=tune_config,
-        search_alg=HyperOptSearch(metric="loss", mode="min"),  # Specify metric and mode
+        search_alg=HyperOptSearch(metric="final_loss", mode="min"),  # Specify metric and mode
         stop={"training_iteration": 10},
         resources_per_trial={"gpu": 1},
         num_samples=10,
