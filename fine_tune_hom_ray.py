@@ -7,7 +7,7 @@ from torchvision.models import resnet50
 from transformers import AutoTokenizer, AutoModel
 from ray import tune
 from ray.tune.integration.pytorch_lightning import TuneReportCallback
-from ray.tune.suggest.hyperopt import HyperOptSearch
+from ray.tune.search.hyperopt import HyperOptSearch
 from hyperopt import hp
 
 class DictToObject:
