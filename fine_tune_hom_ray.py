@@ -14,6 +14,7 @@ class DictToObject:
     def __init__(self, **entries):
         self.__dict__.update(entries)
 
+
 def train_model(config, checkpoint_dir=None):
     img_encoder = resnet50(pretrained=True)
     img_encoder.fc = torch.nn.Linear(2048, 768)
@@ -25,6 +26,9 @@ def train_model(config, checkpoint_dir=None):
         config['minibatch_size'] = config['batch_size']
 
     model = CustomCLIPWrapper(img_encoder, txt_encoder, config['minibatch_size'], avg_word_embs=True)
+    
+    # Add the 'folder' argument to the config
+    config['folder'] = "/project01/cvrl/sabraha2/DSIAC_CLIP_DATA/"
     
     # Convert config dictionary to an object with __dict__ attribute
     config_object = DictToObject(**config)
