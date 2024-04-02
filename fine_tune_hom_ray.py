@@ -7,7 +7,8 @@ from torchvision.models import resnet50
 from transformers import AutoTokenizer, AutoModel
 from ray import tune
 from ray.tune.integration.pytorch_lightning import TuneReportCallback
-from ray.tune.search.bayesopt import BayesOptSearch
+from ray.tune.suggest.hyperopt import HyperOptSearch
+from hyperopt import hp
 
 class DictToObject:
     def __init__(self, **entries):
@@ -44,8 +45,8 @@ def main(config):
         "max_epochs": tune.randint(5, 20),  # Uniform distribution for max_epochs
         "minibatch_size": tune.choice([16, 32, 64]),  
         "batch_size": config['batch_size'],
-        "learning_rate": tune.loguniform(1e-5, 1e-3),  
-        "weight_decay": tune.loguniform(1e-6, 1e-2),  
+        "learning_rate": hp.loguniform('learning_rate', -5, -3),  
+        "weight_decay": hp.loguniform('weight_decay', -6, -2),  
         "optimizer": tune.choice(["adam", "sgd"]),
         # Add other hyperparameters to tune here
     }
@@ -53,7 +54,7 @@ def main(config):
     analysis = tune.run(
         train_model,
         config=tune_config,
-        search_alg=BayesOptSearch(),
+        search_alg=HyperOptSearch(),
         stop={"training_iteration": 10},
         resources_per_trial={"gpu": 1},
         num_samples=10,
