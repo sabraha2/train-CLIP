@@ -35,14 +35,14 @@ def train_model(config, checkpoint_dir=None):
         precision=16,
         accelerator='gpu',
         logger=True,
-        callbacks=[TuneReportCallback({"loss": "ptl/val_loss"})]
+        callbacks=[TuneReportCallback({"loss": "val_loss"})]
     )
     
     trainer.fit(model, dm)
 
 def main(config):
     tune_config = {
-        "max_epochs": tune.randint(1, 4),  # Uniform distribution for max_epochs
+        "max_epochs": tune.randint(0, 2),  # Uniform distribution for max_epochs
         "minibatch_size": tune.choice([16, 32, 64]),  
         "batch_size": config['batch_size'],
         "learning_rate": hp.loguniform('learning_rate', -5, -3),  
