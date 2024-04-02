@@ -48,7 +48,6 @@ def main(config):
         stop={"training_iteration": 10},
         resources_per_trial={"gpu": 1},
         num_samples=10,
-        
     )
 
     best_trial = analysis.get_best_trial("loss", "min", "last")
@@ -61,6 +60,6 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', type=int, default=32)
     # Add other hyperparameters to the argument parser here
 
-    args, _ = parser.parse_known_args()
+    args = parser.parse_args()
 
     main(vars(args))
