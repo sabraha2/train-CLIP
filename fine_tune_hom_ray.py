@@ -7,7 +7,7 @@ from torchvision.models import resnet50
 from transformers import AutoTokenizer, AutoModel
 from ray import tune
 from ray.tune.integration.pytorch_lightning import TuneReportCallback
-from ray.tune.suggest.bayesopt import BayesOptSearch
+from ray.tune.search.bayesopt import BayesOptSearch
 
 class DictToObject:
     def __init__(self, **entries):
