@@ -8,6 +8,11 @@ from transformers import AutoTokenizer, AutoModel
 from ray import tune
 from ray.tune.integration.pytorch_lightning import TuneReportCallback
 
+import types
+
+class DictToObject:
+    def __init__(self, **entries):
+        self.__dict__.update(entries)
 
 def train_model(config, checkpoint_dir=None):
     img_encoder = resnet50(pretrained=True)
@@ -20,7 +25,11 @@ def train_model(config, checkpoint_dir=None):
         config['minibatch_size'] = config['batch_size']
 
     model = CustomCLIPWrapper(img_encoder, txt_encoder, config['minibatch_size'], avg_word_embs=True)
-    dm = TextImageDataModule.from_argparse_args(config, custom_tokenizer=tokenizer)
+    
+    # Convert config dictionary to an object with __dict__ attribute
+    config_object = DictToObject(**config)
+    
+    dm = TextImageDataModule.from_argparse_args(config_object, custom_tokenizer=tokenizer)
     
     trainer = Trainer(
         max_epochs=config['max_epochs'],
