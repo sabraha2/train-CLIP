@@ -184,7 +184,7 @@ class CustomCLIPWrapper(CLIPWrapper):
                  kl_coeff=1.0,
                  avg_word_embs=False
                  ):
-        with open('/afs/crc.nd.edu/user/s/sabraha2/Projects/SPIE_2024/train-CLIP/models/configs') as fin:
+        with open('/afs/crc.nd.edu/user/s/sabraha2/Projects/SPIE_2024/train-CLIP/models/configs/RN.yaml') as fin:
             config = yaml.safe_load(fin)['RN50']
         super().__init__('RN50', config, minibatch_size)
         del self.model.visual
