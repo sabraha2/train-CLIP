@@ -7,13 +7,11 @@ from torchvision.models import resnet50
 from transformers import AutoTokenizer, AutoModel
 from ray import tune
 from ray.tune.integration.pytorch_lightning import TuneReportCallback
-
-import types
+from ray.tune.suggest.bayesopt import BayesOptSearch
 
 class DictToObject:
     def __init__(self, **entries):
         self.__dict__.update(entries)
-
 
 def train_model(config, checkpoint_dir=None):
     img_encoder = resnet50(pretrained=True)
@@ -26,13 +24,8 @@ def train_model(config, checkpoint_dir=None):
         config['minibatch_size'] = config['batch_size']
 
     model = CustomCLIPWrapper(img_encoder, txt_encoder, config['minibatch_size'], avg_word_embs=True)
-    
-    # Add the 'folder' argument to the config
     config['folder'] = "/project01/cvrl/sabraha2/DSIAC_CLIP_DATA/"
-    
-    # Convert config dictionary to an object with __dict__ attribute
     config_object = DictToObject(**config)
-    
     dm = TextImageDataModule.from_argparse_args(config_object, custom_tokenizer=tokenizer)
     
     trainer = Trainer(
@@ -46,18 +39,21 @@ def train_model(config, checkpoint_dir=None):
     
     trainer.fit(model, dm)
 
-
 def main(config):
     tune_config = {
-        "max_epochs": config['max_epochs'],
-        "minibatch_size": tune.choice([16, 32, 64]),  # Define the search space for minibatch_size
-        "batch_size": config['batch_size'],  # Assuming batch_size is fixed
+        "max_epochs": tune.randint(5, 20),  # Uniform distribution for max_epochs
+        "minibatch_size": tune.choice([16, 32, 64]),  
+        "batch_size": config['batch_size'],
+        "learning_rate": tune.loguniform(1e-5, 1e-3),  
+        "weight_decay": tune.loguniform(1e-6, 1e-2),  
+        "optimizer": tune.choice(["adam", "sgd"]),
         # Add other hyperparameters to tune here
     }
 
     analysis = tune.run(
         train_model,
         config=tune_config,
+        search_alg=BayesOptSearch(),
         stop={"training_iteration": 10},
         resources_per_trial={"gpu": 1},
         num_samples=10,
@@ -66,12 +62,10 @@ def main(config):
     best_trial = analysis.get_best_trial("loss", "min", "last")
     print("Best hyperparameters found were: ", best_trial.config)
 
-
 if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('--max_epochs', type=int, default=10)
     parser.add_argument('--batch_size', type=int, default=32)
-    # Add other hyperparameters to the argument parser here
 
     args = parser.parse_args()
 
