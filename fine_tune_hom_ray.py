@@ -47,7 +47,8 @@ def main(config):
         config=tune_config,
         stop={"training_iteration": 10},
         resources_per_trial={"gpu": 1},
-        checkpoint_at_end=True
+        num_samples=10,
+        
     )
 
     best_trial = analysis.get_best_trial("loss", "min", "last")
