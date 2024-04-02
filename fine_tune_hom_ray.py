@@ -7,7 +7,7 @@ from torchvision.models import resnet50
 from transformers import AutoTokenizer, AutoModel
 from ray import tune
 from ray.tune.integration.pytorch_lightning import TuneReportCallback
-from ray.tune.search.hyperopt import HyperOptSearch
+from ray.tune.suggest.hyperopt import HyperOptSearch
 from hyperopt import hp
 
 class DictToObject:
@@ -54,7 +54,7 @@ def main(config):
     analysis = tune.run(
         train_model,
         config=tune_config,
-        search_alg=HyperOptSearch(),
+        search_alg=HyperOptSearch(metric="loss", mode="min"),  # Specify metric and mode
         stop={"training_iteration": 10},
         resources_per_trial={"gpu": 1},
         num_samples=10,
