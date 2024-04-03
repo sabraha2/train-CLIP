@@ -170,12 +170,15 @@ class EvaluationScript:
 
     def analyze_similarity_distribution(self, image_embeddings, text_embeddings):
         similarity = cosine_similarity(image_embeddings, text_embeddings)
-        similarity_values = similarity.flatten()
-        self.visualize_similarity_distribution(similarity_values)
+         # Compute histogram of similarity values
+        hist, bin_edges = np.histogram(similarity, bins=50, density=False)
+        
+        # Visualize the distribution
+        self.visualize_similarity_distribution(hist, bin_edges)
 
-    def visualize_similarity_distribution(self, similarity_values):
+    def visualize_similarity_distribution(self, hist, bin_edges):
         plt.figure(figsize=(10, 6))
-        sns.histplot(similarity_values, bins=50, kde=True, color='skyblue', edgecolor='black')
+        plt.bar(bin_edges[:-1], hist, width=np.diff(bin_edges), color='skyblue', edgecolor='black')
         plt.title('Distribution of Cosine Similarities', fontsize=16)
         plt.xlabel('Cosine Similarity', fontsize=14)
         plt.ylabel('Frequency', fontsize=14)
