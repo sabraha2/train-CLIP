@@ -32,19 +32,17 @@ class EvaluationScript:
         return img_encoder, txt_encoder
 
     def load_model(self):
-        # Load checkpoint manually
+        # Load the checkpoint
         checkpoint = torch.load(self.model_checkpoint_path, map_location=self.device)
 
-        # Initialize model with encoders
-        model = CustomCLIPWrapper(
-            img_encoder=self.img_encoder,
-            txt_encoder=self.txt_encoder,
-            minibatch_size=32,  # Or other necessary initialization arguments
-            avg_word_embs=True  # Assuming this argument or similar is required
-        )
+        # Initialize the model without passing the encoders directly
+        model = CustomCLIPWrapper(minibatch_size=32, avg_word_embs=True)
+        
+        # Manually assign the encoders
+        model.img_encoder = self.img_encoder
+        model.txt_encoder = self.txt_encoder
 
-        # Apply state dict from checkpoint to the model
-        # Make sure the state dict matches expected keys in the model
+        # Apply state dict
         model.load_state_dict(checkpoint['state_dict'])
         model.eval()
         model.to(self.device)
