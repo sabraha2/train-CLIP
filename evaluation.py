@@ -74,7 +74,7 @@ class EvaluationScript:
 
             images = images.to(self.device)
             # Prepare text inputs properly for the encode_text method
-            inputs = self.model.tokenizer(texts, return_tensors="pt", padding=True, truncation=True, max_length=512)
+            inputs = self.tokenizer(texts, return_tensors="pt", padding=True, truncation=True, max_length=512)
             inputs = {key: value.to(self.device) for key, value in inputs.items()}
 
             with torch.no_grad():
