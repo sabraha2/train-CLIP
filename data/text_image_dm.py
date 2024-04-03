@@ -108,6 +108,7 @@ class TextImageDataset(Dataset):
 class TextImageDataModule(LightningDataModule):
     def __init__(self,
                  folder: str,
+                 test_folder: str,  # Add test_folder argument
                  batch_size: int,
                  num_workers=0,
                  image_size=224,
@@ -129,6 +130,7 @@ class TextImageDataModule(LightningDataModule):
         """
         super().__init__()
         self.folder =folder
+        self.test_folder = test_folder  # Store the test folder path
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.image_size = image_size
@@ -141,6 +143,7 @@ class TextImageDataModule(LightningDataModule):
     def add_argparse_args(parent_parser):
         parser = argparse.ArgumentParser(parents=[parent_parser], add_help=False)
         parser.add_argument('--folder', type=str, required=True, help='directory of your training folder')
+        parser.add_argument('--test_folder', type=str, required=True, help='directory of your test folder')
         parser.add_argument('--batch_size', type=int, help='size of the batch')
         parser.add_argument('--num_workers', type=int, default=0, help='number of workers for the dataloaders')
         parser.add_argument('--image_size', type=int, default=224, help='size of the images')
@@ -149,16 +152,18 @@ class TextImageDataModule(LightningDataModule):
         return parser
     
     def setup(self, stage=None):
-        # Create the full dataset
-        full_dataset = TextImageDataset(self.folder, image_size=self.image_size, resize_ratio=self.resize_ratio, shuffle=self.shuffle, custom_tokenizer=not self.custom_tokenizer is None)
+        if stage == 'test':  # Load test dataset for the test stage
+            self.test_dataset = TextImageDataset(self.test_folder, image_size=self.image_size, resize_ratio=self.resize_ratio, shuffle=False, custom_tokenizer=not self.custom_tokenizer is None)
+        else:
+            # Create the full dataset
+            full_dataset = TextImageDataset(self.folder, image_size=self.image_size, resize_ratio=self.resize_ratio, shuffle=self.shuffle, custom_tokenizer=not self.custom_tokenizer is None)
 
-        # Split the dataset into training and validation
-        self.train_dataset, self.val_dataset = train_test_split(
-            full_dataset, 
-            test_size=self.val_split,  # Use the validation split ratio
-            shuffle=self.shuffle
-        )
-    
+            # Split the dataset into training and validation
+            self.train_dataset, self.val_dataset = train_test_split(
+                full_dataset, 
+                test_size=self.val_split,
+                shuffle=self.shuffle
+            )
     # def setup(self, stage=None):
     #     self.dataset = TextImageDataset(self.folder, image_size=self.image_size, resize_ratio=self.resize_ratio, shuffle=self.shuffle, custom_tokenizer=not self.custom_tokenizer is None)
     
