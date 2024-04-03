@@ -68,9 +68,12 @@ class EvaluationScript:
         
         image_embeddings, text_embeddings = [], []
 
-        for batch_idx, (images, texts) in enumerate(test_loader):
+        for batch_idx, batch in enumerate(test_loader):
             self.logger.info(f"Processing batch {batch_idx + 1}...")
-            images, texts = images.to(self.device), texts.to(self.device)
+            images, texts = batch  # Directly unpacking the batch
+
+            images = images.to(self.device)
+            texts = texts.to(self.device) if hasattr(texts, 'to') else texts
             
             with torch.no_grad():
                 image_embed = self.model.encode_image(images)
