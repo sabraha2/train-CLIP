@@ -73,11 +73,13 @@ class EvaluationScript:
             images, texts = batch  # Directly unpacking the batch
 
             images = images.to(self.device)
-            texts = texts.to(self.device) if hasattr(texts, 'to') else texts
-            
+            # Prepare text inputs properly for the encode_text method
+            inputs = self.model.tokenizer(texts, return_tensors="pt", padding=True, truncation=True, max_length=512)
+            inputs = {key: value.to(self.device) for key, value in inputs.items()}
+
             with torch.no_grad():
                 image_embed = self.model.encode_image(images)
-                text_embed = self.model.encode_text(texts)
+                text_embed = self.model.encode_text(inputs)
 
             image_embeddings.append(image_embed.cpu().numpy())
             text_embeddings.append(text_embed.cpu().numpy())
