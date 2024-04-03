@@ -135,7 +135,7 @@ class CLIPWrapper(pl.LightningModule):
         image_logits, text_logits = self.forward(image, text)
         ground_truth = torch.arange(len(image_logits))
         loss = (F.cross_entropy(image_logits, ground_truth) + F.cross_entropy(text_logits, ground_truth)).div(2)
-        self.log('val_loss', loss)
+        self.log('val_loss', loss, on_epoch=True, prog_bar=True, logger=True)
 
     def configure_optimizers(self):
         lr = {
