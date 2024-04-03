@@ -25,8 +25,13 @@ class EvaluationScript:
         self.model.to(self.device)
         
         # Configure logging
-        logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger(__name__)
+        self.logger.setLevel(logging.INFO)
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.INFO)
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        console_handler.setFormatter(formatter)
+        self.logger.addHandler(console_handler)
 
     def create_encoders(self):
         img_encoder = resnet50(pretrained=True)
