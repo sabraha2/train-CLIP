@@ -314,8 +314,10 @@ class CustomCLIPWrapper(CLIPWrapper):
     
     
     def encode_image(self, images):
-        # Assuming self.model.visual is set to your image encoder and is ready to process image inputs
-        return self.model.visual(images)
+        self.logger.info(f"Encoding {len(images)} images.")
+        encoded_images = self.model.visual(images)
+        self.logger.info(f"Image embeddings shape: {encoded_images.shape}")
+        return encoded_images
 
 
     def encode_text(self, inputs, teacher=False):
