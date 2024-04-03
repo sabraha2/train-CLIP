@@ -6,11 +6,9 @@ from data.text_image_dm import TextImageDataModule
 from argparse import ArgumentParser
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.manifold import TSNE
 import seaborn as sns
-import pandas as pd
 import logging
 
 class EvaluationScript:
@@ -40,19 +38,13 @@ class EvaluationScript:
         return img_encoder, txt_encoder
 
     def load_model(self):
-        img_encoder = resnet50(pretrained=True)
-        img_encoder.fc = torch.nn.Linear(2048, 768)
-        
-        txt_encoder = AutoModel.from_pretrained("johngiorgi/declutr-sci-base")
-
         model = CustomCLIPWrapper.load_from_checkpoint(
             checkpoint_path=self.model_checkpoint_path,
-            image_encoder=img_encoder,
-            text_encoder=txt_encoder,
+            image_encoder=self.img_encoder,
+            text_encoder=self.txt_encoder,
             minibatch_size=32,
             avg_word_embs=True
         )
-        
         model.eval()
         return model
 
@@ -74,15 +66,11 @@ class EvaluationScript:
         
         self.logger.info("Test dataset loaded.")
         
-        image_embeddings, text_embeddings, labels = [], [], []
+        image_embeddings, text_embeddings = [], []
 
-        for batch_idx, (images, texts, label) in enumerate(test_loader):
+        for batch_idx, (images, texts) in enumerate(test_loader):
             self.logger.info(f"Processing batch {batch_idx + 1}...")
             images, texts = images.to(self.device), texts.to(self.device)
-            
-            # Log shapes and dimensions
-            self.logger.info(f"Image batch shape: {images.shape}")
-            self.logger.info(f"Text batch shape: {texts.shape}")
             
             with torch.no_grad():
                 image_embed = self.model.encode_image(images)
@@ -90,7 +78,6 @@ class EvaluationScript:
 
             image_embeddings.append(image_embed.cpu().numpy())
             text_embeddings.append(text_embed.cpu().numpy())
-            labels.extend(label.cpu().numpy())
 
         self.logger.info("Data processing completed.")
 
@@ -100,48 +87,97 @@ class EvaluationScript:
 
         image_embeddings = np.concatenate(image_embeddings, axis=0)
         text_embeddings = np.concatenate(text_embeddings, axis=0)
-        self.compute_metrics(image_embeddings, text_embeddings, labels)
-        self.visualize_embeddings(image_embeddings, text_embeddings, labels)
+        self.analyze_similarity_distribution(image_embeddings, text_embeddings)
+        # Call the t-SNE visualization method
+        self.visualize_tsne_embeddings(image_embeddings, text_embeddings)
+        # Assuming you have adjusted data loading to include paths and descriptions
+        # self.visualize_top_n_matches(image_embeddings, text_embeddings, image_paths, text_descriptions, n=5)
         self.logger.info("Evaluation completed.")
+    
+    def visualize_tsne_embeddings(self, image_embeddings, text_embeddings):
+        """Visualize t-SNE plot of image and text embeddings."""
+        self.logger.info("Generating t-SNE visualization...")
+        
+        # Combine image and text embeddings
+        combined_embeddings = np.vstack((image_embeddings, text_embeddings))
+        
+        # Perform t-SNE
+        tsne_results = TSNE(n_components=2, random_state=42).fit_transform(combined_embeddings)
+        
+        # Split back into image and text embeddings for plotting
+        tsne_images, tsne_texts = tsne_results[:len(image_embeddings)], tsne_results[len(image_embeddings):]
+        
+        plt.figure(figsize=(12, 8))
+        
+        plt.scatter(tsne_images[:, 0], tsne_images[:, 1], c='blue', label='Images', alpha=0.5)
+        plt.scatter(tsne_texts[:, 0], tsne_texts[:, 1], c='red', label='Texts', alpha=0.5)
+        
+        plt.legend()
+        plt.title("t-SNE visualization of Image and Text Embeddings", fontsize=15)
+        plt.xlabel("t-SNE 1", fontsize=12)
+        plt.ylabel("t-SNE 2", fontsize=12)
+        
+        plt.grid(True, which='both', linestyle='--', linewidth=0.5)
+        plt.tight_layout()
+        plt.savefig('tsne_embeddings_visualization.png')
+        plt.show()
+    
+    def visualize_top_n_matches(self, image_embeddings, text_embeddings, image_paths, text_descriptions, n=5):
+        """
+        Visualizes top-N text descriptions that are most similar to each image.
+        Args:
+        - image_embeddings: Embeddings of the images.
+        - text_embeddings: Embeddings of the texts.
+        - image_paths: Paths to the images for loading and displaying.
+        - text_descriptions: Corresponding descriptions for each text embedding.
+        - n: Number of top matches to visualize.
+        """
+        self.logger.info("Visualizing top-N text matches for images...")
 
-    def compute_metrics(self, image_embeddings, text_embeddings, labels):
-        self.logger.info("Computing metrics...")
+        # Compute cosine similarity and get top N indices for texts per image
         similarity = cosine_similarity(image_embeddings, text_embeddings)
-        predicted_indices = np.argmax(similarity, axis=1)
-        true_indices = np.arange(len(labels))
+        top_n_indices = np.argsort(similarity, axis=1)[:, -n:][::-1]
 
-        accuracy = accuracy_score(true_indices, predicted_indices)
-        precision, recall, f1, _ = precision_recall_fscore_support(true_indices, predicted_indices, average='macro')
+        # Randomly select a few images to visualize
+        selected_images = np.random.choice(len(image_embeddings), size=min(3, len(image_embeddings)), replace=False)
 
-        self.logger.info(f"Accuracy: {accuracy:.4f}")
-        self.logger.info(f"Precision: {precision:.4f}, Recall: {recall:.4f}, F1 Score: {f1:.4f}")
+        for image_index in selected_images:
+            image = plt.imread(image_paths[image_index])
+            plt.figure(figsize=(5 + 3*n, 4))
 
-    def visualize_embeddings(self, image_embeddings, text_embeddings, labels):
-        self.logger.info("Visualizing embeddings...")
-        tsne = TSNE(n_components=2, random_state=42)
-        tsne_results = tsne.fit_transform(np.concatenate((image_embeddings, text_embeddings), axis=0))
+            plt.subplot(1, n+1, 1)
+            plt.imshow(image)
+            plt.title("Image")
+            plt.axis('off')
 
-        labels_double = ['Image']*len(image_embeddings) + ['Text']*len(text_embeddings)
-        self.plot_tsne(tsne_results, labels_double, title='CLIP Embeddings t-SNE Visualization')
+            for rank, text_index in enumerate(top_n_indices[image_index], start=1):
+                plt.subplot(1, n+1, rank+1)
+                text = text_descriptions[text_index]
+                plt.text(0.5, 0.5, text, ha='center', va='center')
+                plt.title(f"Match {rank}")
+                plt.axis('off')
 
-    @staticmethod
-    def plot_tsne(tsne_results, labels, title):
-        df_subset = pd.DataFrame()
-        df_subset['tsne-2d-one'] = tsne_results[:, 0]
-        df_subset['tsne-2d-two'] = tsne_results[:, 1]
-        df_subset['label'] = labels
+            plt.tight_layout()
+            plt.savefig(f"top_{n}_matches_image_{image_index}.png")
+            plt.show()
 
-        plt.figure(figsize=(16,10))
-        sns.scatterplot(
-            x="tsne-2d-one", y="tsne-2d-two",
-            hue="label",
-            palette=sns.color_palette("hsv", 2),
-            data=df_subset,
-            legend="full",
-            alpha=0.3
-        )
-        plt.title(title)
-        plt.savefig('tsne_visualization.png')
+
+
+    def analyze_similarity_distribution(self, image_embeddings, text_embeddings):
+        similarity = cosine_similarity(image_embeddings, text_embeddings)
+        similarity_values = similarity.flatten()
+        self.visualize_similarity_distribution(similarity_values)
+
+    def visualize_similarity_distribution(self, similarity_values):
+        plt.figure(figsize=(10, 6))
+        sns.histplot(similarity_values, bins=50, kde=True, color='skyblue', edgecolor='black')
+        plt.title('Distribution of Cosine Similarities', fontsize=16)
+        plt.xlabel('Cosine Similarity', fontsize=14)
+        plt.ylabel('Frequency', fontsize=14)
+        plt.grid(True, linestyle='--', alpha=0.7)
+        plt.tight_layout()
+        plt.savefig('similarity_distribution.png')
+        plt.show()
 
 if __name__ == "__main__":
     parser = ArgumentParser()
