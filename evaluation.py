@@ -76,7 +76,8 @@ class EvaluationScript:
         
         image_embeddings, text_embeddings, labels = [], [], []
 
-        for images, texts, label in test_loader:
+        for batch_idx, (images, texts, label) in enumerate(test_loader):
+            self.logger.info(f"Processing batch {batch_idx + 1}...")
             images, texts = images.to(self.device), texts.to(self.device)
             
             # Log shapes and dimensions
