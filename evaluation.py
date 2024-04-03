@@ -11,7 +11,6 @@ from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.manifold import TSNE
 import seaborn as sns
 import pandas as pd
-
 import logging
 
 class EvaluationScript:
@@ -29,8 +28,30 @@ class EvaluationScript:
         logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger(__name__)
 
+    def create_encoders(self):
+        img_encoder = resnet50(pretrained=True)
+        img_encoder.fc = torch.nn.Linear(2048, 768)
+        txt_encoder = AutoModel.from_pretrained("johngiorgi/declutr-sci-base")
+        return img_encoder, txt_encoder
+
+    def load_model(self):
+        img_encoder = resnet50(pretrained=True)
+        img_encoder.fc = torch.nn.Linear(2048, 768)
+        
+        txt_encoder = AutoModel.from_pretrained("johngiorgi/declutr-sci-base")
+
+        model = CustomCLIPWrapper.load_from_checkpoint(
+            checkpoint_path=self.model_checkpoint_path,
+            image_encoder=img_encoder,
+            text_encoder=txt_encoder,
+            minibatch_size=32,
+            avg_word_embs=True
+        )
+        
+        model.eval()
+        return model
+
     def evaluate(self):
-        self.logger.info("Starting evaluation...")
         data_module = TextImageDataModule(
             folder=self.test_dataset_path,
             test_folder=self.test_dataset_path,
