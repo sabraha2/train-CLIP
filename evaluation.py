@@ -13,10 +13,9 @@ import seaborn as sns
 import pandas as pd
 
 class EvaluationScript:
-    def __init__(self, model_checkpoint_path, dataset_path, test_dataset_path, batch_size=32):
+    def __init__(self, model_checkpoint_path, test_dataset_path, batch_size=32):
         self.model_checkpoint_path = model_checkpoint_path
-        self.dataset_path = dataset_path
-        self.test_dataset_path = test_dataset_path  # New argument for the test dataset path
+        self.test_dataset_path = test_dataset_path
         self.batch_size = batch_size
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.tokenizer = AutoTokenizer.from_pretrained("johngiorgi/declutr-sci-base")
@@ -31,13 +30,11 @@ class EvaluationScript:
         return img_encoder, txt_encoder
 
     def load_model(self):
-        # Initialize the image and text encoders
         img_encoder = resnet50(pretrained=True)
         img_encoder.fc = torch.nn.Linear(2048, 768)
         
         txt_encoder = AutoModel.from_pretrained("johngiorgi/declutr-sci-base")
 
-        # Load the CustomCLIPWrapper model from the checkpoint with the correct arguments
         model = CustomCLIPWrapper.load_from_checkpoint(
             checkpoint_path=self.model_checkpoint_path,
             image_encoder=img_encoder,
@@ -50,19 +47,16 @@ class EvaluationScript:
         return model
 
     def evaluate(self):
-        # Initialize and set up the data module
         data_module = TextImageDataModule(
-            folder=self.dataset_path,
-            test_folder=self.test_dataset_path,  # Pass the test dataset path
+            test_folder=self.test_dataset_path,
             batch_size=self.batch_size,
             image_size=224,
             resize_ratio=0.75,
             shuffle=False,
             custom_tokenizer=self.tokenizer
         )
-        data_module.setup(stage='test')  # Specify 'test' stage to load the test dataset
+        data_module.setup(stage='test')
         
-        # Use the test dataloader for evaluation
         test_loader = data_module.test_dataloader()
 
         image_embeddings, text_embeddings, labels = [], [], []
@@ -122,10 +116,9 @@ class EvaluationScript:
 if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("--model_checkpoint_path", type=str, required=True, help="Path to the model checkpoint file")
-    parser.add_argument("--dataset_path", type=str, required=True, help="Path to the training dataset")
     parser.add_argument("--test_dataset_path", type=str, required=True, help="Path to the test dataset")
     parser.add_argument("--batch_size", type=int, default=32, help="Evaluation batch size")
     args = parser.parse_args()
 
-    eval_script = EvaluationScript(args.model_checkpoint_path, args.dataset_path, args.test_dataset_path, args.batch_size)
+    eval_script = EvaluationScript(args.model_checkpoint_path, args.test_dataset_path, args.batch_size)
     eval_script.evaluate()
