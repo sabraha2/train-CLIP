@@ -1,4 +1,9 @@
 import torch
+from torchvision.models import resnet50
+from transformers import AutoTokenizer, AutoModel
+from models import CustomCLIPWrapper
+from data.text_image_dm import TextImageDataModule
+from argparse import ArgumentParser
 from torchvision.transforms import Compose, Resize, ToTensor, Normalize
 from torch.utils.data import DataLoader
 import numpy as np
@@ -8,40 +13,48 @@ from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.manifold import TSNE
 import seaborn as sns
 import pandas as pd
-from models import CustomCLIPWrapper 
-from data.text_image_dm import TextImageDataModule
-from transformers import AutoTokenizer, AutoModel
-from argparse import ArgumentParser
 
 class EvaluationScript:
     def __init__(self, model_checkpoint_path, dataset_path, batch_size=32):
         self.model_checkpoint_path = model_checkpoint_path
         self.dataset_path = dataset_path
         self.batch_size = batch_size
-        self.model = self.load_model()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.tokenizer = AutoTokenizer.from_pretrained("johngiorgi/declutr-sci-base")
+        self.img_encoder, self.txt_encoder = self.create_encoders()
+        self.model = self.load_model()
         self.model.to(self.device)
-        self.transform = Compose([
-            Resize((224, 224)),
-            ToTensor(),
-            Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-        ])
+
+    def create_encoders(self):
+        img_encoder = resnet50(pretrained=True)
+        img_encoder.fc = torch.nn.Linear(2048, 768)
+        txt_encoder = AutoModel.from_pretrained("johngiorgi/declutr-sci-base")
+        return img_encoder, txt_encoder
 
     def load_model(self):
-        # Example of loading the CustomCLIPWrapper model from a checkpoint
-        model = CustomCLIPWrapper.load_from_checkpoint(checkpoint_path=self.model_checkpoint_path)
+        # Load model with image and text encoders initialized
+        model = CustomCLIPWrapper.load_from_checkpoint(
+            checkpoint_path=self.model_checkpoint_path,
+            img_encoder=self.img_encoder,
+            txt_encoder=self.txt_encoder,
+            minibatch_size=32,  # Adjust as necessary
+            avg_word_embs=True
+        )
         model.eval()
         return model
 
     def evaluate(self):
-        # Initialize the data module with the test dataset path and other configurations
-        data_module = TextImageDataModule(folder=self.dataset_path, batch_size=self.batch_size,
-                                          image_size=224, resize_ratio=0.75, shuffle=False, custom_tokenizer=self.tokenizer)
-        
-        # Setup the data module
+        # Initialize the data module
+        data_module = TextImageDataModule(
+            folder=self.dataset_path,
+            batch_size=self.batch_size,
+            image_size=224,
+            resize_ratio=0.75,
+            shuffle=False,
+            custom_tokenizer=self.tokenizer
+        )
         data_module.setup()
 
-        # Get the test dataloader
         test_loader = data_module.val_dataloader()
 
         image_embeddings, text_embeddings, labels = [], [], []
