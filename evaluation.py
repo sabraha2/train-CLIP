@@ -57,6 +57,8 @@ class EvaluationScript:
         return model
 
     def evaluate(self):
+        self.logger.info("Starting evaluation...")
+        
         data_module = TextImageDataModule(
             folder=self.test_dataset_path,
             test_folder=self.test_dataset_path,
@@ -69,7 +71,9 @@ class EvaluationScript:
         data_module.setup(stage='test')
         
         test_loader = data_module.test_dataloader()
-
+        
+        self.logger.info("Test dataset loaded.")
+        
         image_embeddings, text_embeddings, labels = [], [], []
 
         for images, texts, label in test_loader:
@@ -86,6 +90,12 @@ class EvaluationScript:
             image_embeddings.append(image_embed.cpu().numpy())
             text_embeddings.append(text_embed.cpu().numpy())
             labels.extend(label.cpu().numpy())
+
+        self.logger.info("Data processing completed.")
+
+        if len(image_embeddings) == 0 or len(text_embeddings) == 0:
+            self.logger.error("No embeddings found.")
+            return
 
         image_embeddings = np.concatenate(image_embeddings, axis=0)
         text_embeddings = np.concatenate(text_embeddings, axis=0)
