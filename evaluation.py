@@ -52,7 +52,7 @@ class EvaluationScript:
         return model
 
     def evaluate(self):
-        # Initialize the data module
+        # Initialize and set up the data module
         data_module = TextImageDataModule(
             folder=self.dataset_path,
             batch_size=self.batch_size,
@@ -62,8 +62,9 @@ class EvaluationScript:
             custom_tokenizer=self.tokenizer
         )
         data_module.setup()
-
-        test_loader = data_module.val_dataloader()
+        
+        # Use the test dataloader for evaluation
+        test_loader = data_module.test_dataloader()
 
         image_embeddings, text_embeddings, labels = [], [], []
 

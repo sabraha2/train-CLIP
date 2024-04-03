@@ -10,6 +10,7 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms as T
 from pytorch_lightning import LightningDataModule
+from sklearn.model_selection import train_test_split
 
 
 class TextImageDataset(Dataset):
@@ -112,7 +113,8 @@ class TextImageDataModule(LightningDataModule):
                  image_size=224,
                  resize_ratio=0.75,
                  shuffle=False,
-                 custom_tokenizer=None
+                 custom_tokenizer=None,
+                 val_split=0.1  # New argument for validation split
                  ):
         """Create a text image datamodule from directories with congruent text and image names.
 
@@ -133,6 +135,7 @@ class TextImageDataModule(LightningDataModule):
         self.resize_ratio = resize_ratio
         self.shuffle = shuffle
         self.custom_tokenizer = custom_tokenizer
+        self.val_split = val_split  # Store the validation split ratio
     
     @staticmethod
     def add_argparse_args(parent_parser):
@@ -146,11 +149,44 @@ class TextImageDataModule(LightningDataModule):
         return parser
     
     def setup(self, stage=None):
-        self.dataset = TextImageDataset(self.folder, image_size=self.image_size, resize_ratio=self.resize_ratio, shuffle=self.shuffle, custom_tokenizer=not self.custom_tokenizer is None)
+        # Create the full dataset
+        full_dataset = TextImageDataset(self.folder, image_size=self.image_size, resize_ratio=self.resize_ratio, shuffle=self.shuffle, custom_tokenizer=not self.custom_tokenizer is None)
+
+        # Split the dataset into training and validation
+        self.train_dataset, self.val_dataset = train_test_split(
+            full_dataset, 
+            test_size=self.val_split,  # Use the validation split ratio
+            shuffle=self.shuffle
+        )
+    
+    # def setup(self, stage=None):
+    #     self.dataset = TextImageDataset(self.folder, image_size=self.image_size, resize_ratio=self.resize_ratio, shuffle=self.shuffle, custom_tokenizer=not self.custom_tokenizer is None)
     
     def train_dataloader(self):
-        return DataLoader(self.dataset, batch_size=self.batch_size, shuffle=self.shuffle, num_workers=self.num_workers, drop_last=True , collate_fn=self.dl_collate_fn)
+        return DataLoader(
+            self.train_dataset, 
+            batch_size=self.batch_size, 
+            shuffle=self.shuffle, 
+            num_workers=self.num_workers, 
+            drop_last=True , 
+            collate_fn=self.dl_collate_fn)
     
+    def val_dataloader(self):
+        return DataLoader(
+            self.val_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=self.num_workers,
+            collate_fn=self.dl_collate_fn
+        )
+    
+    def test_dataloader(self):
+        return DataLoader(
+            self.test_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=self.num_workers
+        )
     def dl_collate_fn(self, batch):
         if self.custom_tokenizer is None:
             return torch.stack([row[0] for row in batch]), torch.stack([row[1] for row in batch])
