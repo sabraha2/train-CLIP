@@ -49,6 +49,7 @@ class EvaluationScript:
     def evaluate(self):
         data_module = TextImageDataModule(
             folder=self.test_dataset_path,
+            test_folder=self.test_dataset_path,
             batch_size=self.batch_size,
             image_size=224,
             resize_ratio=0.75,
