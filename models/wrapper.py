@@ -47,28 +47,6 @@ class CLIPWrapper(pl.LightningModule):
 
         effective_batch_size = dataset.batch_size * self.trainer.accumulate_grad_batches * num_devices
         return (dataset_size // effective_batch_size) * self.trainer.max_epochs
-    
-    # @property
-    # def num_training_steps(self) -> int:
-    #     """Total training steps inferred from datamodule and devices."""
-    #     #if self.trainer.max_steps:
-    #     #    return self.trainer.max_steps
-
-    #     #dataset = self.train_dataloader()
-    #     dataset = self.trainer._data_connector._train_dataloader_source.dataloader()
-    #     dataset_size = len(dataset)
-
-    #     num_devices = max(1, self.trainer.num_gpus, self.trainer.num_processes)
-    #     if self.trainer.tpu_cores:
-    #         num_devices = max(num_devices, self.trainer.tpu_cores)
-
-    #     effective_batch_size = dataset.batch_size * self.trainer.accumulate_grad_batches * num_devices
-    #     #print(dataset.batch_size, self.trainer.accumulate_grad_batches, num_devices)
-    #     #print(dataset_size, effective_batch_size, self.trainer.max_epochs)
-    #     #num_steps = (dataset_size // effective_batch_size) * self.trainer.max_epochs
-    #     num_steps = dataset_size * self.trainer.max_epochs // (self.trainer.accumulate_grad_batches * num_devices)
-    #     print(num_steps)
-    #     return num_steps
 
     # Training loss: https://github.com/openai/CLIP/issues/83
     # Mini-batching thanks to https://github.com/crowsonkb / https://twitter.com/RiversHaveWings
@@ -184,7 +162,7 @@ class CustomCLIPWrapper(CLIPWrapper):
                  kl_coeff=1.0,
                  avg_word_embs=False
                  ):
-        with open('/afs/crc.nd.edu/user/s/sabraha2/Projects/SPIE_2024/train-CLIP/models/configs/RN.yaml') as fin:
+        with open('models/configs/RN.yaml') as fin:
             config = yaml.safe_load(fin)['RN50']
         super().__init__('RN50', config, minibatch_size)
         del self.model.visual
